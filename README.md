@@ -6,4 +6,4 @@ All data is in `stata | data`. Due to github size limitations, two data sets are
   1. stata/data/country_hsproduct4digit_year.dta
   2. stata/data/OECD_REGION_ECONOM_GVA_pW_22032024210336896.csv
 
-
+Thesis pdf is [here](https://github.com/joshua-bailey/baileyj_thesis/blob/9c799ea08902936a9d836a677b4a81ffbbe21fe7/baileyj_masters_thesis.pdf).
