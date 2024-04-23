@@ -1,4 +1,13 @@
-* joshua bailey - thesis - main code 
+* joshua bailey - masters thesis - stata do file 
+
+/*
+Contents (separated by horizontal lines) :
+
+1. GENERATE VARIABLES AND DATA PREP
+2. TABLES 
+3. FIGURES 
+
+*/
 
 clear all
 clear mata
@@ -6,29 +15,20 @@ clear matrix
 set more off
 set scheme white_tableau 
 
-cd "/Users/joshuabailey/Library/Mobile Documents/com~apple~CloudDocs/thesis/baileyj_thesis"
+cd "/Users/joshuabailey/Library/Mobile Documents/com~apple~CloudDocs/thesis/masters_thesis_code"
 
-global	main 		"/Users/joshuabailey/Library/Mobile Documents/com~apple~CloudDocs/thesis/baileyj_thesis"
-global 	data		"$main/data"
+global	main 		"/Users/joshuabailey/Library/Mobile Documents/com~apple~CloudDocs/thesis/masters_thesis_code"
+global 	data		"$main/data1"
 global 	figures		"$main/figures"
 
 
 
-// (1) SUB-NATIONAL: EXPORTS - GOODS AND SERVICES =============================
-clear
-import excel using "$data/consoludated_subnationaltrade_goodsservices_final.xlsx", sheet("Sheet1") firstrow cellrange(A1:AM373)
+// GENERATE VARIABLES AND DATA PREP ===========================================
 
-keep if Directionoftrade == "Exports"
-drop Directionoftrade ITLlevel goods* services* check_goods check_services tot tot_ons_timeseries difference
-reshape long tot_, i(year ITLname) j(sector) string
-rename tot_ exports
 
-ecomplexity exports, i(ITLname) p(sector) t(year)
-drop if ITLcode == "UNK2" 
+// ECONOMIC COMPLEXITY MEASURES 
 
-save subnat_export_eci, replace
-
-// (2) SUB-NATIONAL: EMPLOYMENT MEASURES ======================================
+* Employment-based ECI
 
 clear 
 import excel using "$data/employment_itl2.xlsx", firstrow sheet("employment") cellrange(A1:AP2185)
@@ -52,54 +52,20 @@ save subnat_employment_eci, replace
 
 
 
-// ADDITIONAL VERSIONS ========================================================
-
-// (3) SUB-NATIONAL: GOODS EXPORTS, ONS, 2021, UK MODEL =======================
+* Exportt-based ECI 
 
 clear
-import excel using "$data/subnationaltradeingoods20211.xlsx", sheet("Table 7 Full data") firstrow cellrange(A6:G29253)
+import excel using "$data/consoludated_subnationaltrade_goodsservices_final.xlsx", sheet("Sheet1") firstrow cellrange(A1:AM373)
 
-keep if Directionoftrade=="Exports" & ITLlevel=="ITL2" & PartnerCountry=="All countries"
-replace Value = "." if Value=="[c]"
-destring Value, replace
+keep if Directionoftrade == "Exports"
+drop Directionoftrade ITLlevel goods* services* check_goods check_services tot tot_ons_timeseries difference
+reshape long tot_, i(year ITLname) j(sector) string
+rename tot_ exports
 
-drop if Industry == "Unknown" | Industry == "All industries"
+ecomplexity exports, i(ITLname) p(sector) t(year)
+drop if ITLcode == "UNK2" 
 
-* Produce ECI variables and clean output
-ecomplexity Value, i(ITLname) p(Industry) asym
-
-* Gen extra variables
-gen distance = 1/density
-
-gen high_pci = 1 if pci>=1
-replace high_pci = 0 if pci<1
-
-save subnat_exportgoods_eci, replace
-
-
-// (4) SUB-NATIONAL: SERVICES EXPORTS, ONS, 2021, UK MODEL ====================
-
-clear
-import excel using "$data/subnationaltradeinservices2021.xlsx", sheet("Table 9 Full data") firstrow cellrange(A6:G27009)
-
-keep if Directionoftrade=="Exports" & ITLlevel=="ITL2" & PartnerCountry=="All countries"
-replace Value = "." if Value=="[c]"
-destring Value, replace
-
-drop if Industry == "All industries (Exc. Travel)" 
-
-* Produce ECI variables and clean output
-ecomplexity Value, i(ITLname) p(Industry) asym
-
-* Gen extra variables
-gen distance = 1/density
-
-gen high_pci = 1 if pci>=1
-replace high_pci = 0 if pci<1
-
-save subnat_exportservices_eci, replace
-
-
+save subnat_export_eci, replace
 
 * Combine ECI measures and accounts data for analysis
 
@@ -131,9 +97,7 @@ drop if missing(itl2)
 save eci_comb, replace
 
 
-// PREPARE ADDITIONAL VARIABLES ===============================================
-
-* prepare national accounts data
+// OTHER DATA PREP
 
 * regional gva - index=2019
 clear
@@ -225,6 +189,24 @@ rename ITL2code ITLcode
 
 save gfcf_gbp, replace
 
+* capital stock 
+clear
+import delimited using "$data/martin_gfcf_itl2.csv", varnames(1)
+
+* construct stock
+gen real_gfcf_cp = gfcf_cp / (gfcf_deflator/100)
+keep if asset == "Total"
+keep if sic07 == "Total"
+gsort itl2code year
+gsort itl2code year
+
+bysort itl2code (year) : gen cap_stock = sum(real_gfcf_cp)
+
+rename itl2code ITLcode 
+rename itl2name ITLname
+
+save cap_stock, replace
+
 
 * gdhi, current prices
 clear 
@@ -299,7 +281,6 @@ rename tot_ons_timeseries exports_ons_timeseries
 save exports, replace
 
 * human capital, share of population with certain education, OECD
-
 clear
 import delimited using "$data/OECD_UKREGION_EDUCAT_24032024162130593.csv", varnames(1)
 
@@ -313,6 +294,7 @@ gen sh_tertiary = value if educationiscedlevel == "Total tertiary education (ISC
 gen sh_uppersecondary = value if educationiscedlevel == "Upper secondary and post-secondary non-tertiary education"
 collapse sh_tertiary sh_uppersecondary, by(ITLcode ITLname year)
 gen sh_uppersec_tertiary = sh_tertiary + sh_uppersecondary
+
 
 save human_cap, replace
 
@@ -369,7 +351,7 @@ replace ITLname = "Outer London - West and North West" if reg_id == "UKI7"
 replace ITLcode = "TLI7" if reg_id == "UKI7"
 drop if missing(objectid)
 
-*take average urbanisation code and round 
+* take average urbanisation code and round 
 sencode broad_ruc11, gen(urban) gsort(-v11)
 collapse urban, by(ITLname ITLcode)
 gen urban_itl2 = round(urban, 1)
@@ -389,6 +371,7 @@ rename Regionname ITLname
 save gdp_pc, replace
 
 
+
 * merge accounts data into ECI 
 use eci_comb, clear 
 
@@ -399,6 +382,7 @@ merge 1:1 ITLcode ITLname year using gva_ph_gbp, keepusing(gva_ph_gbp) nogen
 merge 1:1 ITLcode ITLname year using gva_pj_index, keepusing(gva_pj_index) nogen
 merge 1:1 ITLcode ITLname year using gva_pj_gbp, keepusing(gva_pj_gbp) nogen
 merge 1:1 ITLcode ITLname year using gfcf_gbp, keepusing(gfcf_gbp) nogen
+merge 1:1 ITLcode ITLname year using cap_stock, keepusing(cap_stock) nogen
 merge 1:1 ITLcode year using gdhi_gbp, keepusing(gdhi_gbp) nogen
 merge 1:1 ITLcode year using gdhi_pp_gbp, keepusing(gdhi_pp_gbp) nogen
 merge 1:1 ITLcode ITLname year using fdi_earn_gbp, keepusing(fdi_earn_gbp) nogen
@@ -442,8 +426,8 @@ use consolidated_all, clear
 
 
 * Define global macros for file names for easier reference and potential adjustments
-global table1 "table1.doc"
-global table2 "table2.doc"
+global table1 "table1_final.doc"
+global table2 "table2_final.doc"
 
 * Label variables for cleaner table names
 label variable ln_gva_ph_gbp "ln GVA per hour"
@@ -456,7 +440,7 @@ label variable sh_tertiary "Sh Tertiary"
 
 
 * Table 1: Living Standards and ECI - cross section 
-foreach outcome in ln_gva_ph_gbp ln_gdp_pc_gbp {
+foreach outcome in ln_gdhi_pp_gbp ln_gdp_pc_gbp {
        
     * (1) Emp with capital
     reg `outcome' std_eci ln_gfcf_gbp, robust
@@ -517,10 +501,137 @@ foreach outcome in ln_gva_ph_gbp ln_gdp_pc_gbp {
 
 
 
-// Figures ====================================================================
+// robustness tables: gdhi and gva per job
+
+global table3 "table3_final.doc"
+global table4 "table4_final.doc"
+
+* Table 3: Living Standards and ECI - cross section - gdhi and gva per job
+foreach outcome in ln_gdhi_pp_gbp ln_gva_pj_gbp {
+       
+    * (1) Emp with capital
+    reg `outcome' std_eci ln_gfcf_gbp, robust
+    outreg2 using $table3, append word label ctitle("`outcome'", "Emp: K") adjr2
+	
+	* (2) Exp with capital
+	reg `outcome' std_eci_exports ln_gfcf_gbp, robust
+    outreg2 using $table3, append word label ctitle(Exp: K) adjr2
+    
+	* (3) Emp with capital and educ
+    reg `outcome' std_eci ln_gfcf_gbp sh_tertiary, robust
+    outreg2 using $table3, append word label ctitle(Emp: K+L) adjr2
+	
+	* (4) Exp with capital and educ
+	reg `outcome' std_eci_exports ln_gfcf_gbp sh_tertiary, robust
+    outreg2 using $table3, append word label ctitle(Exp: K+L) adjr2
+    
+    * (5) Emp and Exp with capital
+    reg `outcome' std_eci std_eci_exports ln_gfcf_gbp, robust
+    outreg2 using $table3, append word label ctitle(Emp/Exp: K) adjr2
+    
+	* (6) Emp and Exp with capital and educ
+    reg `outcome' std_eci std_eci_exports ln_gfcf_gbp sh_tertiary, robust
+    outreg2 using $table3, append word label ctitle(Emp/Exp: K+L) title("Table 3 - Cross section") sortvar(std_eci std_eci_exports) adjr2
+	
+}
 
 
-// Section 1 ==================================================================
+* Table 4: Living Standards and ECI - panel - gdhi and gva per job
+foreach outcome in ln_gdhi_pp_gbp ln_gva_pj_gbp {
+       
+    * (1) Emp, capital - RE
+    xtreg `outcome' std_eci ln_gfcf_gbp, robust
+    outreg2 using $table4, append word label ctitle("`outcome'", "Emp: K") addtext(Urban FE, NO) e(r2_w r2_b r2_o)
+    
+    * (2) Exp, capital - RE
+    xtreg `outcome' std_eci_exports ln_gfcf_gbp, robust
+    outreg2 using $table4, append word label ctitle(Exp: K) addtext(Urban FE, NO) e(r2_w r2_b r2_o)
+	
+	* (3) Emp and Exp, capital - RE
+    xtreg `outcome' std_eci std_eci_exports ln_gfcf_gbp, robust
+    outreg2 using $table4, append word label ctitle(Emp/Exp: K) addtext(Urban FE, NO) e(r2_w r2_b r2_o)
+	
+    * (4) Emp, capital - FE
+    reghdfe `outcome' std_eci ln_gfcf_gbp, vce(robust) absorb(urban_itl2)
+    outreg2 using $table4, append word label ctitle(Emp: K) addtext(Urban FE, YES) adjr2 
+    
+    * (5) Exp, capital - FE
+    reghdfe `outcome' std_eci_exports ln_gfcf_gbp, vce(robust)  absorb(urban_itl2)
+    outreg2 using $table4, append word label ctitle(Exp: K) addtext(Urban FE, YES) adjr2 
+	
+	* (6) Emp and Exp, capital - FE
+    reghdfe `outcome' std_eci std_eci_exports ln_gfcf_gbp, vce(robust) absorb(urban_itl2)
+    outreg2 using $table4, append word label ctitle(Emp/Exp: K) addtext(Urban FE, YES) title("Table 4 - Panel") sortvar(std_eci std_eci_exports) adjr2 
+    
+}
+
+
+
+// robustness tables: with additional controls
+
+global table5 "table5_final.doc"
+global table6 "table6_final.doc"
+
+* Table 5: Living Standards and ECI - cross section - controls
+foreach outcome in ln_gva_ph_gbp ln_gdp_pc_gbp {
+       
+    * (1) Emp with capital
+    reg `outcome' std_eci ln_gfcf_gbp, robust
+    outreg2 using $table5, append word label ctitle("`outcome'", "Emp: K") adjr2
+	
+	* (2) Emp with capital and educ
+    reg `outcome' std_eci ln_gfcf_gbp sh_tertiary, robust
+    outreg2 using $table5, append word label ctitle(Emp: K+L) adjr2
+	
+	* (3) Emp with gerd
+	reg `outcome' std_eci ln_gerd_business ln_gerd_gov ln_gerd_he, robust
+    outreg2 using $table5, append word label ctitle(Emp: R&D) adjr2
+    
+    * (4) Emp and capital and gerd 
+    reg `outcome' std_eci ln_gfcf_gbp ln_gerd_business ln_gerd_gov ln_gerd_he, robust
+    outreg2 using $table5, append word label ctitle(Emp: K+R&D) adjr2
+    
+	* (5) Emp and capital, human cap and gerd 
+    reg `outcome' std_eci ln_gfcf_gbp sh_tertiary ln_gerd_business ln_gerd_gov ln_gerd_he, robust
+    outreg2 using $table5, append word label ctitle(Emp: K+L+R&D) title("Table 5 - Cross section") sortvar(std_eci std_eci_exports) adjr2
+	
+}
+
+
+* Table 4: Living Standards and ECI - panel - controls
+foreach outcome in ln_gva_ph_gbp ln_gdp_pc_gbp {
+	
+       
+    * (1) Emp with capital
+    xtreg `outcome' std_eci ln_gfcf_gbp, robust
+    outreg2 using $table6, append word label ctitle("`outcome'", "Emp: K") addtext(Urban FE, NO) e(r2_w r2_b r2_o)
+    
+   * (2) Emp with gerd
+	xtreg `outcome' std_eci ln_gerd_business ln_gerd_gov ln_gerd_he, robust
+    outreg2 using $table6, append word label ctitle(Emp: R&D) addtext(Urban FE, NO) e(r2_w r2_b r2_o)
+	
+	* (3) Emp with capital and gerd
+	xtreg `outcome' std_eci ln_gfcf_gbp ln_gerd_business ln_gerd_gov ln_gerd_he, robust
+    outreg2 using $table6, append word label ctitle(Emp: K+R&D) addtext(Urban FE, NO) e(r2_w r2_b r2_o)
+	
+    * (4) Emp and gerd, fe
+    reghdfe `outcome' std_eci ln_gfcf_gbp sh_tertiary, vce(robust) absorb(urban_itl2)
+    outreg2 using $table6, append word label ctitle(Emp: R&D) addtext(Urban FE, YES) adjr2 
+    
+    * (5) Emp and capital and gerd, fe
+    reghdfe `outcome' std_eci ln_gfcf_gbp ln_gerd_business ln_gerd_gov ln_gerd_he, vce(robust)  absorb(urban_itl2)
+    outreg2 using $table6, append word label ctitle(Exp: K+R&D) addtext(Urban FE, YES) title("Table 6 - Panel") sortvar(std_eci std_eci_exports) adjr2  
+
+    
+}
+
+
+
+
+// FIGURES ====================================================================
+
+
+// Section 2 ==============================
 
 // (Fig) GDP per capita, UK regions 
 
@@ -604,7 +715,7 @@ graph export "$figures/gdhi_pc_index.png", replace
 
 // (Fig) Deindustrialisation, Standbury et al (2023)
 
-* Load ARDECO raw sector by region level data
+*  Load ARDECO raw sector by region level data
 use "$data/ardeco_sectorlevel_data_all", clear
 
 * Rename all variables lower case
@@ -720,7 +831,6 @@ graph export "$figures/deindustrialisation_over_time.png", replace
 	
 // (Fig) Regional GVA per worker over time
 
-
 use "$data/ardeco_regionlevel_data_all", clear
 gen uk = 1 if substr(NUTS_ID, 1, 2) == "UK"
 keep if uk == 1
@@ -743,7 +853,6 @@ xtline GVA_pw, ///
 	note("Source: ARDECO", size(vsmall))
 	
 graph export "$figures/gva_pw.png", replace
-
 
 
 
@@ -794,6 +903,7 @@ graph export "$figures/gva_pw_range.png", replace
 
 
 // (Fig) Regional GVA per worker over time, UK disparities, persistence
+
 use "$data/ardeco_regionlevel_data_all", clear
 keep if year == 2019 | year == 1980 
 keep if STAT_LEVL_CODE == 2
@@ -842,11 +952,11 @@ graph export "$figures/gva_pw_range_timeseries.png", replace
 
 // (Fig) UK agglomeration, population and GVA
 
-*Import data from Centre for Cities, data from Rodrigues and Breach 2021)
+* Import data from Centre for Cities, data from Rodrigues and Breach 2021)
 clear
 import excel "$data/CentreForCities", sheet(forstata) firstrow
 
-*Plot population against GVA per worker
+* Plot population against GVA per worker
 replace population = population/1000000
 replace gvapw = gvapw/1000
 capture drop pos
@@ -920,9 +1030,138 @@ twoway ///
 graph export "$figures/road_rail.png", replace
 
 
+// (Fig) GFCF, ardeco 
+
+use "$data/ardeco_regionlevel_data_all", clear 
+keep if STAT_LEVL_CODE == 1
+keep NUTS_ID year NUTS_NAME ROIGT RNPTN RNPTD RNETD
+gen ROIGT_PC = (ROIGT / RNPTD) * 1000
+keep if substr(NUTS_ID, 1, 2) == "DE" | substr(NUTS_ID, 1, 2) == "FR" | substr(NUTS_ID, 1, 2) == "UK"
+drop if substr(NUTS_NAME, 1, 11) == "Extra regio"
+drop if NUTS_NAME == "Extra-Regio"
+drop if year == 2022
+
+encode NUTS_NAME, gen(_NUTS_NAME)
+xtset _NUTS_NAME year, yearly
+
+keep if year>2008 & year<2020
+sum ROIGT_PC
+collapse ROIGT ROIGT_PC, by(NUTS_ID NUTS_NAME)
+replace NUTS_NAME = subinstr(NUTS_NAME, " (UK)", "", .)
+replace NUTS_NAME = subinstr(NUTS_NAME, " (IT)", "", .)
+replace NUTS_NAME = subinstr(NUTS_NAME, " (ES)", "", .)
 
 
-// Section 2 ==================================================================
+gsort ROIGT_PC 
+gen ROIGT_PC_rank = [_n]
+gen ROIGT_PC_UK = ROIGT_PC if substr(NUTS_ID, 1, 2) == "UK"
+replace ROIGT_PC = . if !missing(ROIGT_PC_UK)
+
+* plot
+graph hbar ROIGT_PC ROIGT_PC_UK, over(NUTS_NAME, sort(ROIGT_PC_rank) descending label(angle(0) labsize(vsmall))) ///
+	legend(off) ///
+	yline(6.594164) ///
+	ytitle("Real gross fixed capital formation per person, 2009-2019 average, '000 EUR", size(small)) ///
+	ylabel(,nogrid nogextend) ///
+	plotregion(lcolor(black)) ///
+	note("Source: ARDECO. UK ITL1 regions highlighted. UK, Germany and France ITL1 regions shown." "Dotted line is the EU (inc. UK) 2009-19 unweighted average.", size(vsmall))
+	
+graph export "$figures/ardeco_gfcf.png", replace	
+
+
+// (Fig) Public investment analysis 
+
+use consolidated_all, clear 
+
+* Assume ITLcode variable exists and contains the region codes
+gen itl1 = substr(ITLcode, 1, 3)
+
+* Generate the region name variable using `cond()` function
+gen str24 itl1name = cond(itl1 == "TLC", "North East", ///
+                          cond(itl1 == "TLD", "North West", ///
+                          cond(itl1 == "TLE", "Yorkshire and the Humber", ///
+                          cond(itl1 == "TLF", "East Midlands", ///
+                          cond(itl1 == "TLG", "West Midlands", ///
+                          cond(itl1 == "TLH", "East of England", ///
+                          cond(itl1 == "TLI", "London", ///
+                          cond(itl1 == "TLJ", "South East", ///
+                          cond(itl1 == "TLK", "South West", "")))))))))
+
+collapse eci diversity coi, by(itl1 itl1name year)
+rename itl1name region
+
+merge m:1 region year using "$data/ons_regional_public_spending", nogen
+
+ds year itl1 region eci diversity coi gvapc population, not
+foreach var of varlist `r(varlist)' {
+	gen `var'_pc_th = (`var'/population) * 1000
+	replace `var' = `var'/ 1000
+	rename `var' `var'_bn
+} 
+
+* gen extra vars
+gen capex_growth_pc_th = capex_economic_pc_th + capex_eductraining_pc_th + capex_housing_pc_th
+
+* plot capex by cat
+graph hbar (sum) capex_econ_transport_pc_th capex_econ_ecdev_pc_th capex_econ_scitech_pc_th capex_econ_agric_pc_th capex_econ_employment_pc_th capex_defence_pc_th capex_eductraining_pc_th capex_housing_pc_th capex_health_pc_th capex_environment_pc_th capex_recculture_pc_th capex_publicorder_pc_th capex_social_pc_th if !missing(region), /// 
+	ascategory ///
+	yvaroptions(relabel(1 "Econ - Transport" ///
+						2 "Econ - Development" ///
+						3 "Econ - Science and Tech" ///
+						4 "Econ - Agriculture" ///
+						5 "Econ - Employment" ///
+						6 "Defence" ///
+						7 "Education and Training" ///
+						8 "Housing" ///
+						9 "Health" ///
+						10 "Environment" ///
+						11 "Culture" ///
+						12 "Public order" ///
+						13 "Social other")) ///
+	ytitle("Cumulative public capital investment, per person, 1999-2019, £'000") ///
+	ylabel(,nogrid nogextend) ///
+	plotregion(lcolor(black)) ///
+	note("Source: ONS - Country and Regional Analysis", size(vsmall))
+
+graph export "$figures/public_capitalspend_area.png", replace		
+	
+
+* capex by region and cat
+graph hbar (sum) capex_economic_pc_th capex_defence_pc_th capex_eductraining_pc_th capex_housing_pc_th capex_health_pc_th capex_environment_pc_th capex_recculture_pc_th capex_publicorder_pc_th capex_social_pc_th if !missing(region), over(region, sort(1) descending) stack ///
+	legend(order(1 "Economic development" ///
+						2 "Defence" ///
+						3 "Education and Training" ///
+						4 "Housing" ///
+						5 "Health" ///
+						6 "Environment" ///
+						7 "Culture" ///
+						8 "Public order" ///
+						9 "Social other")) ///
+	ytitle("Cumulative public capital investment, per person, 1999-2019, £'000") ///
+	ylabel(,nogrid nogextend) ///
+	plotregion(lcolor(black)) ///
+	note("Source: ONS - Country and Regional Analysis. All economic development sub-categories combined.", size(vsmall))
+
+graph export "$figures/public_capitalspend_region.png", replace	
+
+* growth spending and ECI 
+twoway scatter eci capex_growth_pc_th ///
+	|| scatter eci capex_growth_pc_th if region == "London" ///
+	|| lfit eci capex_growth_pc_th, ///
+		legend(order(1 "All ex. London" 2 "London") ring(0)) ///
+		xtitle("Growth-supporting public capital spending, per head, per year, £'000") ///
+		ytitle("Economic Complexity Index") ///
+		ylabel(,nogrid nogextend) ///
+		xlabel(,nogrid nogextend) /// 
+		plotregion(lcolor(black)) ///
+		note("Source: ONS - Country and Regional Analysis." "Growth-supporting capital includes capital spending on economic development, education and training, and housing. Period covers 2015-2019.", size(vsmall))
+		
+graph export "$figures/public_capitalspend_eci.png", replace	
+
+
+
+
+// Section 4 ================================================
 
 // (Fig) Export, ITL1
 
@@ -1023,6 +1262,8 @@ graph hbar Buildings ICT Intangibles Other_tangible Transport, ///
 graph export "$figures/gfcf_2017_20.png", replace
 
 
+
+
 // (Fig) Employment ECI, ITL2, 2019
 
 use subnat_employment_eci, clear
@@ -1084,8 +1325,6 @@ twoway scatter eci_2015 eci_2022 ///
 graph export "$figures/eci_emp_overtimescatter.png", replace
 
 
-
-
 // (Fig) PCI employment, top and bottom 15 sectors
 
 use subnat_employment_eci, clear
@@ -1121,7 +1360,6 @@ graph export "$figures/pci_emp_topbottom.png", replace
 
 // (Fig) ECI for core cities, plus top and bottom places 
 
-
 use subnat_employment_eci, clear
 
 * import geographic labels
@@ -1149,7 +1387,6 @@ graph hbar eci_excorecity eci_corecity if eci>1.75 | eci<-0.5 | core_city==1, ov
 	plotregion(lcolor(black)) ///
 	note("Source: ONS - Nomis." "Plot shows regions with ECI > 1.75, < -0.5, and the Core Cities (highlighted).", size(vsmall))
 
-
 graph export "$figures/eci_emp_topbottom_corecity.png", replace
 
 
@@ -1175,8 +1412,7 @@ twoway scatter eci diversity ///
 	
 graph export "$figures/eci_rca.png", replace
 
-
-// (Fig) ECI employment relationship with key outcome cariables 
+// (Fig) ECI employment relationship with key outcome variables 
 
 use consolidated_all, clear
 
@@ -1585,7 +1821,6 @@ twoway scatter coi gva_ph_gbp ///
 		note("Source: ONS - Nomis. London and Core Cities highlighted.", size(vsmall)) 
 
 graph export "$figures/city_coi.png", replace	
-	
 
 
 // (Fig) OOG, high value sectors to target
@@ -1652,15 +1887,6 @@ graph export "$figures/city_glasgow_cog.png", replace
 
 
 
-// (Fig) Allocation of resources, identifying sectoral opportunities, economic shape
-
-// GERD 
-// 
-
-
-
-
-
 // (Fig) NIPO
 
 use "$data/nipo", clear 
@@ -1698,3 +1924,181 @@ twoway line total_overtime Implementationdate if Implementationdate < date("01no
 
 graph export "$figures/nipo.png", replace
 
+
+
+// (Fig) VMPK
+
+clear
+import delimited using "$data/martin_gfcf_itl1.csv", varnames(1)
+
+* construct stock
+gen real_gfcf_cp = gfcf_cp / (gfcf_deflator/100)
+keep if asset == "Total"
+keep if sic07 == "Total"
+gsort itl1code year
+gsort itl1code year
+
+bysort itl1code (year) : gen cap_stock = sum(real_gfcf_cp)
+
+replace itl1name = subinstr(itl1name, " (England)", "", .)
+replace itl1name = "East of England" if itl1name == "East"
+replace itl1name = "Yorkshire and the Humber" if itl1name == "Yorkshire and The Humber"
+rename itl1code ITLcode 
+rename itl1name ITLname
+drop sic07 asset
+
+save cap_stock_itl1, replace
+
+* grab fdi series 
+
+clear
+import excel using "$data/20230419FDIsubnatinwardtables.xlsx", sheet("1.1 ITL1 flow") cellrange(A4:J186) firstrow 
+
+ds n*
+foreach var of varlist `r(varlist)' {
+  replace `var' = "0" if `var' == "c" | `var' == "low"
+  destring `var', replace
+}
+
+keep if Measure == "Total net FDI flows in the UK"
+drop Measure 
+reshape long n, i(Regionname ITL1code) j(year)
+rename n fdi_flow
+replace Regionname = subinstr(Regionname, " (England)", "", .)
+replace Regionname = "East of England" if Regionname == "East"
+replace Regionname = "Yorkshire and the Humber" if Regionname == "Yorkshire and The Humber"
+rename Regionname ITLname
+rename ITL1code ITLcode
+
+
+save fdi_flow_itl1, replace
+
+
+use "$data/ons_regional_public_spending", clear
+
+rename region ITLname
+merge 1:1 ITLname year using cap_stock_itl1, nogen
+merge 1:1 ITLcode year using fdi_flow_itl1, nogen 
+
+* construct VMPK
+gen cap_stockpc = cap_stock / population
+
+gen alpha = 0.3
+gen VMPK = alpha * (gvapc/cap_stock) 
+gen lnVMPK = ln(VMPK)
+gen lnGVAPC = ln(gvapc)
+gen lnCAPEX = ln(capex_total)
+gen lnGFCF = ln(real_gfcf_cp)
+gen lnFDI = ln(fdi_flow)
+
+* public capex
+twoway scatter lnVMPK lnCAPEX if year>2009 ///
+	|| scatter lnVMPK lnCAPEX if ITLname == "London" & year>2009 ///
+	|| lfit lnVMPK lnCAPEX if year>2009 ///
+	|| lfit lnVMPK lnCAPEX if ITLname != "London" & year>2009, ///
+		legend(order(1 "All ex. London" 4 "All ex. London fit" 2 "London" 3 "All fit")) ///
+		xtitle(" Log public capital expenditure") ///
+		ytitle("Log VMPK") ///
+		ylabel(,nogrid nogextend) ///
+		xlabel(,nogrid nogextend) /// 
+		plotregion(lcolor(black)) ///
+		note("Source: ONS - Country and Regional Analysis.", size(vsmall))
+		
+graph export "$figures/vmpk_publicinvest.png", replace	
+
+
+* gfcf
+twoway scatter lnVMPK lnGFCF if year>2009 ///
+	|| scatter lnVMPK lnGFCF if ITLname == "London" & year>2009 ///
+	|| lfit lnVMPK lnGFCF if year>2009 ///
+	|| lfit lnVMPK lnGFCF if ITLname != "London" & year>2009, ///
+		legend(order(1 "All ex. London" 4 "All ex. London fit" 2 "London" 3 "All fit")) ///
+		xtitle(" Log Gross Fixed Capital Formation") ///
+		ytitle("Log VMPK") ///
+		ylabel(,nogrid nogextend) ///
+		xlabel(,nogrid nogextend) /// 
+		plotregion(lcolor(black)) ///
+		note("Source: ONS - Country and Regional Analysis.", size(vsmall))
+		
+graph export "$figures/vmpk_gfcf.png", replace	
+	
+* fdi
+twoway scatter lnVMPK lnFDI if year>2009 ///
+	|| scatter lnVMPK lnFDI if ITLname == "London" & year>2009 ///
+	|| lfit lnVMPK lnFDI if year>2009 ///
+	|| lfit lnVMPK lnFDI if ITLname != "London" & year>2009, ///
+		legend(order(1 "All ex. London" 4 "All ex. London fit" 2 "London" 3 "All fit")) ///
+		xtitle(" Log Gross inward Foreign Direct Investment") ///
+		ytitle("Log VMPK") ///
+		ylabel(,nogrid nogextend) ///
+		xlabel(,nogrid nogextend) /// 
+		plotregion(lcolor(black)) ///
+		note("Source: ONS - Country and Regional Analysis.", size(vsmall))
+		
+graph export "$figures/vmpk_fdi.png", replace	
+
+
+	
+// appendix figs 
+
+
+// (Fig) GERD 
+
+use consolidated_all, clear 
+
+graph hbar gerd_business gerd_gov gerd_he gerd_non_profit if year==2019, ///
+	over(ITLname, sort(1) descending label(labsize(vsmall))) stack ///
+	legend(order(1 "Business GERD" 2 "Govt. GERD" 3 "HE GERD" 4 "Non-profit GERD") ring(0)) ///
+	ytitle("Gross domestic expenditure on research and development, £m") ///
+	ylabel(,nogrid nogextend) ///
+	plotregion(lcolor(black)) ///
+	note("Source: ONS. Data shown for 2019.")
+	
+	
+graph export "$figures/gerd_itl2.png", replace	
+
+
+// (Fig) Share of tertiary
+
+use consolidated_all, clear 
+
+graph hbar sh_tertiary if year==2019, ///
+	over(ITLname, sort(1) descending label(labsize(vsmall))) ///
+	nofill ///
+	ytitle("Share of the working population with at least tertiary education") ///
+	ylabel(,nogrid nogextend) ///
+	plotregion(lcolor(black)) ///
+	note("Source: ONS. Data shown for 2019.")
+	
+	
+graph export "$figures/tertiary_itl2.png", replace	
+	
+
+// (Fig) Capital stock
+	
+graph hbar cap_stock if year==2019, ///
+	over(ITLname, sort(1) descending label(labsize(vsmall))) ///
+	nofill ///
+	ytitle("Capital stock, per head, £") ///
+	ylabel(,nogrid nogextend) ///
+	plotregion(lcolor(black)) ///
+	note("Source: ONS. Data shown for 2019.")
+	
+	
+graph export "$figures/capstock_itl2.png", replace	
+
+
+// (Fig) ECI employment and ECI exports 
+
+twoway scatter std_eci std_eci_exports ///
+	|| lfit std_eci std_eci_exports, ///
+		ytitle("ECI employment") ///
+		xtitle("ECI export") ///
+		xlabel(,nogrid nogextend) ///
+		ylabel(,nogrid nogextend) ///
+		plotregion(lcolor(black)) ///
+		aspectratio(1) ///
+		legend(off) ///
+		note("Source: ONS.")
+	
+graph export "$figures/eci_comp.png", replace		
