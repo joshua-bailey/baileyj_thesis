@@ -713,6 +713,32 @@ xtline gdhi_pc_index, overlay ///
 graph export "$figures/gdhi_pc_index.png", replace
 
 
+
+// (Fig) Healthy life expectancy 
+
+clear 
+import excel using "$data/lifeexpect.xlsx", firstrow sheet("data") cellrange(A7:G19)
+
+
+sencode Countryorregion, gen(region) gsort(MalesLifeexpectancy)
+
+
+twoway rcap MalesUpperCI MalesLowerCI region, horizontal lcolor(navy) lwidth(medium) ///
+	|| scatter region MalesLifeexpectancy, mcolor(navy) msymbol(O) msize(vsmall) mlabel(Countryorregion) mlabposition(3) mlabgap(15) ///
+	|| rcap FemalesUpperCI FemalesLowerCI region, horizontal lcolor(orange) lwidth(medium) ///
+	|| scatter region FemalesLifeexpectancy, mcolor(orange) msymbol(O) msize(vsmall) ///
+		legend(label(1 "Male 95% CI") label(2 "Male Life Expectancy") ///
+               label(3 "Female 95% CI") label(4 "Female Life Expectancy")) ///
+        ytitle("Country or Region") ///
+        xtitle("Life Expectancy") ///
+		ylabel(,nogrid nogextend) ///
+		xlabel(,nogrid nogextend) ///
+		plotregion(lcolor(black)) ///
+		note("Source: ONS. Plot shows life expectancy at birth (by sex) in 2020 to 2022 for England, Northern Ireland, Wales, and English regions.", size(vsmall))
+
+graph export "$figures/lifeexpect.png", replace
+
+
 // (Fig) Deindustrialisation, Standbury et al (2023)
 
 *  Load ARDECO raw sector by region level data
