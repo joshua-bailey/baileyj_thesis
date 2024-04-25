@@ -6,7 +6,7 @@ Thesis pdf is [here](https://github.com/joshua-bailey/baileyj_thesis/blob/9c799e
 
 ***
 
-Run `thesis_main.do` to run variable generation, and generate tables and figures (bar the Krugman index and ECI map figures, which are generated with the Jupyter notebooks `krugman.ipynb` and `eci_map.ipynb`.  `complexity2.ipynb` executes the ECI computations manually without additional packages, per the method in §3. 
+Run `thesis_main.do` for variable generation, and tables and figures (bar the Krugman index and ECI map figures, which are generated with the Jupyter notebooks `krugman.ipynb` and `eci_map.ipynb`).  `complexity2.ipynb` executes the ECI computations manually without additional packages, per the method in §3. 
 
 All data is in `stata | data`. Due to github size limitations, two data sets are not included here:
   1. stata/data/country_hsproduct4digit_year.dta
