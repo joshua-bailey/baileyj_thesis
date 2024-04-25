@@ -1,10 +1,12 @@
 ## joshua bailey - masters thesis - economic complexity and UK industrial policy
 
 ***
+### thesis
 
 Thesis pdf is [here](https://github.com/joshua-bailey/baileyj_thesis/blob/9c799ea08902936a9d836a677b4a81ffbbe21fe7/baileyj_masters_thesis.pdf).
 
 ***
+### replication
 
 Run `thesis_main.do` for variable generation, and tables and figures, except the Krugman index and ECI map figures, which are generated with the Jupyter notebooks `krugman.ipynb` and `eci_map.ipynb`.  `complexity2.ipynb` executes the ECI computations manually without additional packages, per the method in §3. 
 
