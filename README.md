@@ -1,4 +1,4 @@
-## joshua bailey - masters thesis - economic complexity and industrial policy
+## joshua bailey - masters thesis - economic complexity and UK industrial policy
 
 ***
 
